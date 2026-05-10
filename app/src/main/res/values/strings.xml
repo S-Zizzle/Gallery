@@ -39,6 +39,27 @@
         <item quantity="other">Are you sure you want to restore %d files?</item>
     </plurals>
     <string name="full_storage_permission_required">Fossify Gallery needs full access to display all your photos and videos. Go to Settings > Permissions > Photos and videos > Allow all.</string>
+    <string name="view_tags">View Tags</string>
+    <string name="generate_exif_tags">Generate EXIF Tags</string>
+    <string name="tags">Tags</string>
+    <string name="preview_ai_tags">Preview AI Tags</string>
+    <string name="save_ai_tags">Generate &amp; Save AI Tags</string>
+    <string name="generating_tags">Generating tags…</string>
+    <string name="clear_tags">Clear Tags</string>
+    <string name="tags_cleared">Tags cleared</string>
+    <string name="search_tags">Search tags…</string>
+    <string name="tag_all_images">Tag all images</string>
+    <string name="tag_all_warning">This will AI-tag all untagged images in this view. It may run for several minutes and will drain battery significantly.\n\nYou can stop at any time from the notification — it will skip already-tagged images next time.</string>
+    <string name="tag_all_not_charging">⚠ Device is not charging. Plug in before starting for best results.</string>
+    <string name="tagging_started">Tagging started — see notification for progress</string>
+    <string name="tagging_notification_title">AI tagging in progress</string>
+    <string name="tagging_initializing">Initializing model…</string>
+    <string name="tagging_notification_text">Image %1$d of %2$d</string>
+    <string name="tagging_complete">Tagging complete: %d images tagged</string>
+    <string name="tagging_stop">Stop</string>
+    <string name="tagging_stopping">Stopping…</string>
+    <string name="tagging_channel_name">AI Image Tagging</string>
+    <string name="model_not_available">AI model not found — import it first via the Tags menu in the image viewer</string>
 
     <!-- Filter -->
     <string name="filter_media">Filter media</string>

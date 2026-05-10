@@ -108,6 +108,7 @@ import org.fossify.gallery.interfaces.DirectoryDao
 import org.fossify.gallery.interfaces.FavoritesDao
 import org.fossify.gallery.interfaces.MediumDao
 import org.fossify.gallery.interfaces.WidgetsDao
+import org.fossify.gallery.interfaces.ImageTagsDao
 import org.fossify.gallery.models.AlbumCover
 import org.fossify.gallery.models.Directory
 import org.fossify.gallery.models.Favorite
@@ -144,6 +145,9 @@ val Context.favoritesDB: FavoritesDao
 
 val Context.dateTakensDB: DateTakensDao
     get() = GalleryDatabase.getInstance(applicationContext).DateTakensDao()
+
+val Context.imageTagsDB: ImageTagsDao
+    get() = GalleryDatabase.getInstance(applicationContext).ImageTagsDao()
 
 val Context.recycleBin: File get() = filesDir
 

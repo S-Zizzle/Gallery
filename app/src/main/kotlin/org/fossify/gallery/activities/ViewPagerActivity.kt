@@ -4,6 +4,7 @@ import android.animation.Animator
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -26,6 +27,7 @@ import android.view.MenuItem
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.core.graphics.drawable.toDrawable
 import androidx.exifinterface.media.ExifInterface
@@ -126,6 +128,7 @@ import org.fossify.gallery.extensions.tryDeleteFileDirItem
 import org.fossify.gallery.extensions.updateDBMediaPath
 import org.fossify.gallery.extensions.updateFavorite
 import org.fossify.gallery.extensions.updateFavoritePaths
+import org.fossify.gallery.extensions.imageTagsDB
 import org.fossify.gallery.fragments.PhotoFragment
 import org.fossify.gallery.fragments.VideoFragment
 import org.fossify.gallery.fragments.ViewPagerFragment
@@ -178,6 +181,9 @@ import org.fossify.gallery.helpers.TYPE_RAWS
 import org.fossify.gallery.helpers.TYPE_SVGS
 import org.fossify.gallery.helpers.TYPE_VIDEOS
 import org.fossify.gallery.helpers.getPermissionToRequest
+import org.fossify.gallery.helpers.ImageExifExtractor
+import org.fossify.gallery.helpers.TaggerHelper
+import org.fossify.gallery.models.ImageTag
 import org.fossify.gallery.models.Medium
 import org.fossify.gallery.models.ThumbnailItem
 import java.io.File
@@ -376,6 +382,10 @@ class ViewPagerActivity : BaseViewerActivity(), ViewPager.OnPageChangeListener, 
                 R.id.menu_resize -> resizeImage()
                 R.id.menu_settings -> launchSettings()
                 R.id.menu_copy_to_clipboard -> copyImageToClipboard()
+                R.id.menu_view_tags -> showImageTags()
+                R.id.menu_generate_exif_tags -> generateTags()
+                R.id.menu_generate_ai_tags_preview -> previewAiTags()
+                R.id.menu_generate_ai_tags_save -> generateAndSaveAiTags()
                 else -> return@setOnMenuItemClickListener false
             }
             return@setOnMenuItemClickListener true
@@ -1539,5 +1549,83 @@ class ViewPagerActivity : BaseViewerActivity(), ViewPager.OnPageChangeListener, 
 
     private fun isExternalIntent(): Boolean {
         return !intent.getBooleanExtra(IS_FROM_GALLERY, false)
+    }
+
+    private fun showImageTags() {
+        ensureBackgroundThread {
+            val imageTag = imageTagsDB.getTagsForPath(mPath)
+            val tags = imageTag?.tags ?: "No tags yet"
+            runOnUiThread {
+                AlertDialog.Builder(this)
+                    .setTitle("Image Tags")
+                    .setMessage(tags)
+                    .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
+                    .setNegativeButton(R.string.clear_tags) { dialog, _ ->
+                        dialog.dismiss()
+                        ensureBackgroundThread {
+                            imageTagsDB.deletePath(mPath)
+                            runOnUiThread { toast(R.string.tags_cleared) }
+                        }
+                    }
+                    .show()
+            }
+        }
+    }
+
+    private fun generateTags() {
+        ensureBackgroundThread {
+            val tags = ImageExifExtractor(applicationContext).extractMetadataTags(mPath)
+            imageTagsDB.insert(ImageTag(id = null, fullPath = mPath, tags = tags, taggedAt = System.currentTimeMillis()))
+            runOnUiThread {
+                toast("Tags generated")
+            }
+        }
+    }
+
+    private fun previewAiTags() {
+        val progressDialog = AlertDialog.Builder(this)
+            .setMessage(R.string.generating_tags)
+            .setCancelable(false)
+            .setView(ProgressBar(this))
+            .show()
+
+        ensureBackgroundThread {
+            val result = TaggerHelper(applicationContext).tagImage(mPath)
+            runOnUiThread {
+                progressDialog.dismiss()
+                AlertDialog.Builder(this)
+                    .setTitle("AI Tag Preview")
+                    .setMessage(if (result.isEmpty()) "No tags generated" else result.joinToString(", "))
+                    .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
+                    .show()
+            }
+        }
+    }
+
+    private fun generateAndSaveAiTags() {
+        val progressDialog = AlertDialog.Builder(this)
+            .setMessage(R.string.generating_tags)
+            .setCancelable(false)
+            .setView(ProgressBar(this))
+            .show()
+
+        ensureBackgroundThread {
+            val aiTags = TaggerHelper(applicationContext).tagImage(mPath)
+            if (aiTags.isNotEmpty()) {
+                val existing = imageTagsDB.getTagsForPath(mPath)
+                val mergedTags = ((existing?.tags?.split(", ") ?: emptyList()) + aiTags)
+                    .distinct().joinToString(", ")
+                imageTagsDB.insert(ImageTag(
+                    id = existing?.id,
+                    fullPath = mPath,
+                    tags = mergedTags,
+                    taggedAt = System.currentTimeMillis()
+                ))
+            }
+            runOnUiThread {
+                progressDialog.dismiss()
+                toast(if (aiTags.isEmpty()) "No AI tags generated" else "AI tags saved")
+            }
+        }
     }
 }

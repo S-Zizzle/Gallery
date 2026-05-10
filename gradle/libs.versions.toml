@@ -8,6 +8,7 @@ detekt = "1.23.8"
 detektCompose = "0.4.28"
 #AndroidX
 androidx-lifecycle = "2.10.0"
+androidx-work = "2.10.1"
 androidx-print = "1.1.0"
 androidx-swiperefreshlayout = "1.2.0"
 androidx-constraintlayout = "2.2.1"
@@ -15,6 +16,7 @@ androidx-documentfile = "1.1.0"
 #exif
 exif = "1.0.1"
 #Room
+litertlmAndroid = "0.11.0"
 room = "2.8.4"
 #Fossify
 commons = "6.1.6"
@@ -54,6 +56,7 @@ androidx-documentfile = { module = "androidx.documentfile:documentfile", version
 exif = { module = "it.sephiroth.android.exif:library", version.ref = "exif" }
 #Room
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "androidx-work" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 #Compose
@@ -63,6 +66,7 @@ fossify-commons = { module = "org.fossify:commons", version.ref = "commons" }
 #Other
 android-gif-drawable = { module = "pl.droidsonroids.gif:android-gif-drawable", version.ref = "androidGifDrawable" }
 android-image-cropper = { module = "com.vanniktech:android-image-cropper", version.ref = "androidImageCropper" }
+litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlmAndroid" }
 subsamplingscaleimageview = { module = "org.fossify:subsampling-scale-image-view", version.ref = "subsamplingScaleImageView" }
 androidsvg-aar = { module = "com.caverock:androidsvg-aar", version.ref = "androidsvgAar" }
 gestureviews = { module = "org.fossify:gestureviews", version.ref = "gestureviews" }

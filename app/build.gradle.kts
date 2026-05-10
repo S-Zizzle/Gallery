@@ -172,7 +172,10 @@ dependencies {
     ksp(libs.glide.compiler)
     implementation(libs.zjupure.webpdecoder)
 
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.bundles.room)
     ksp(libs.androidx.room.compiler)
     detektPlugins(libs.compose.detekt)
+
+    implementation(libs.litertlm.android)
 }

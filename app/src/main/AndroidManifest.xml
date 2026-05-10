@@ -32,6 +32,9 @@
         android:name="android.permission.CAMERA"
         tools:node="remove" />
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <queries>
         <package android:name="org.fossify.gallery.debug" />
         <package android:name="org.fossify.gallery" />
@@ -321,6 +324,10 @@
         </receiver>
 
         <receiver
+            android:name=".receivers.StopTaggingReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".receivers.BootCompletedReceiver"
             android:enabled="true"
             android:exported="true">
@@ -334,6 +341,11 @@
             android:name=".jobs.NewPhotoFetcher"
             android:exported="true"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
 
         <activity-alias
             android:name=".activities.SplashActivity.Red"

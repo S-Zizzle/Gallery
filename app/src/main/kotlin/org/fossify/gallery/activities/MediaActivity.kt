@@ -1,8 +1,14 @@
 package org.fossify.gallery.activities
 
+import android.Manifest
+import android.app.AlertDialog
 import android.app.WallpaperManager
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.os.Build
 import android.graphics.Bitmap
+import android.os.BatteryManager
 import android.os.Bundle
 import android.os.Handler
 import android.view.ViewGroup
@@ -82,6 +88,9 @@ import org.fossify.gallery.extensions.movePathsInRecycleBin
 import org.fossify.gallery.extensions.openPath
 import org.fossify.gallery.extensions.openRecycleBin
 import org.fossify.gallery.extensions.restoreRecycleBinPaths
+import org.fossify.gallery.extensions.imageTagsDB
+import org.fossify.gallery.helpers.BulkTaggerWorker
+import org.fossify.gallery.helpers.TaggerHelper
 import org.fossify.gallery.extensions.showRecycleBinEmptyingDialog
 import org.fossify.gallery.extensions.showRestoreConfirmationDialog
 import org.fossify.gallery.extensions.tryDeleteFileDirItem
@@ -129,6 +138,7 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
     private var mShowLoadingIndicator = true
     private var mWasFullscreenViewOpen = false
     private var mLastSearchedText = ""
+    private var mIsTagSearchMode = false
     private var mLatestMediaId = 0L
     private var mLatestMediaDateId = 0L
     private var mLastMediaHandler = Handler()
@@ -150,6 +160,7 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
 
     companion object {
         var mMedia = ArrayList<ThumbnailItem>()
+        private const val REQUEST_NOTIFICATION_PERMISSION = 1001
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -344,6 +355,7 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
             findItem(R.id.about).isVisible = mShowAll
             findItem(R.id.create_new_folder).isVisible =
                 !mShowAll && mPath != RECYCLE_BIN && mPath != FAVORITES
+            findItem(R.id.tag_all_images).isVisible = mPath != RECYCLE_BIN && mPath != FAVORITES
             findItem(R.id.open_recycle_bin).isVisible = config.useRecycleBin && mPath != RECYCLE_BIN
 
             findItem(R.id.temporarily_show_hidden).isVisible = !config.shouldShowHidden
@@ -392,9 +404,68 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
                 R.id.slideshow -> startSlideshow()
                 R.id.settings -> launchSettings()
                 R.id.about -> launchAbout()
+                R.id.tag_all_images -> startBulkTagging()
                 else -> return@setOnMenuItemClickListener false
             }
             return@setOnMenuItemClickListener true
+        }
+        setupSearchToggle()
+    }
+
+    private fun startBulkTagging() {
+        if (!TaggerHelper(applicationContext).isModelAvailable()) {
+            toast(R.string.model_not_available)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATION_PERMISSION)
+            return
+        }
+        showBulkTaggingDialog()
+    }
+
+    private fun showBulkTaggingDialog() {
+        val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+            status == BatteryManager.BATTERY_STATUS_FULL
+        val message = buildString {
+            append(getString(R.string.tag_all_warning))
+            if (!isCharging) {
+                append("\n\n")
+                append(getString(R.string.tag_all_not_charging))
+            }
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.tag_all_images)
+            .setMessage(message)
+            .setPositiveButton("OK") { _, _ ->
+                BulkTaggerWorker.enqueue(this, mPath)
+                toast(R.string.tagging_started)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
+            showBulkTaggingDialog()
+        }
+    }
+
+    private fun setupSearchToggle() {
+        binding.mediaSearchModeToggle.setOnCheckedChangeListener { _, _ ->
+            mIsTagSearchMode = binding.mediaSearchByTags.isChecked
+            val hint = if (mIsTagSearchMode) {
+                getString(R.string.search_tags)
+            } else {
+                getString(org.fossify.commons.R.string.search_files)
+            }
+            binding.mediaMenu.updateHintText(hint)
+            searchQueryChanged(mLastSearchedText)
         }
     }
 
@@ -432,13 +503,22 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
     }
 
     private fun searchQueryChanged(text: String) {
+        val isTagMode = mIsTagSearchMode
         ensureBackgroundThread {
             try {
-                val filtered = mMedia
-                    .filter { it is Medium && it.name.contains(text, true) } as ArrayList
-                filtered.sortBy { it is Medium && !it.name.startsWith(text, true) }
+                val filtered: ArrayList<Medium> = if (isTagMode) {
+                    if (text.isBlank()) {
+                        mMedia.filterIsInstance<Medium>() as ArrayList<Medium>
+                    } else {
+                        val paths = imageTagsDB.search(text.trim()).map { it.fullPath }.toSet()
+                        mMedia.filter { it is Medium && it.path in paths } as ArrayList<Medium>
+                    }
+                } else {
+                    val result = mMedia.filter { it is Medium && it.name.contains(text, true) } as ArrayList<Medium>
+                    result.also { it.sortBy { m -> !m.name.startsWith(text, true) } }
+                }
                 val grouped = MediaFetcher(applicationContext).groupMedia(
-                    media = filtered as ArrayList<Medium>, path = mPath
+                    media = filtered, path = mPath
                 )
                 runOnUiThread {
                     if (grouped.isEmpty()) {
@@ -450,7 +530,6 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
                         binding.mediaEmptyTextPlaceholder.beGone()
                         binding.mediaFastscroller.beVisible()
                     }
-
                     handleGridSpacing(grouped)
                     getMediaAdapter()?.updateMedia(grouped)
                 }

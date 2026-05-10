@@ -2,6 +2,8 @@ package org.fossify.gallery.activities
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.ViewGroup
 import android.widget.RelativeLayout
 import androidx.recyclerview.widget.GridLayoutManager
@@ -34,6 +36,7 @@ class SearchActivity : SimpleActivity(), MediaOperationsListener {
 
     private var mCurrAsyncTask: GetMediaAsynctask? = null
     private var mAllMedia = ArrayList<ThumbnailItem>()
+    private val searchHandler = Handler(Looper.getMainLooper())
 
     private val binding by viewBinding(ActivitySearchBinding::inflate)
 
@@ -48,6 +51,7 @@ class SearchActivity : SimpleActivity(), MediaOperationsListener {
         binding.searchEmptyTextPlaceholder.setTextColor(getProperTextColor())
         getAllMedia()
         binding.searchFastscroller.updateColors(getProperPrimaryColor())
+        setupSearchToggle()
     }
 
     override fun onResume() {
@@ -78,7 +82,8 @@ class SearchActivity : SimpleActivity(), MediaOperationsListener {
 
         binding.searchMenu.onSearchTextChangedListener = { text ->
             mLastSearchedText = text
-            textChanged(text)
+            searchHandler.removeCallbacksAndMessages(null)
+            searchHandler.postDelayed({ textChanged(text) }, 300)
         }
 
         binding.searchMenu.requireToolbar().setOnMenuItemClickListener { menuItem ->
@@ -94,13 +99,39 @@ class SearchActivity : SimpleActivity(), MediaOperationsListener {
         binding.searchMenu.updateColors()
     }
 
+    private fun setupSearchToggle() {
+        binding.searchModeToggle.setOnCheckedChangeListener { _, _ ->
+            val hint = if (binding.searchByTags.isChecked) {
+                getString(R.string.search_tags)
+            } else {
+                getString(org.fossify.commons.R.string.search_files)
+            }
+            binding.searchMenu.updateHintText(hint)
+            searchHandler.removeCallbacksAndMessages(null)
+            searchHandler.postDelayed({ textChanged(mLastSearchedText) }, 0)
+        }
+    }
+
     private fun textChanged(text: String) {
+        val isTagMode = binding.searchByTags.isChecked
         ensureBackgroundThread {
             try {
-                val filtered = mAllMedia.filter { it is Medium && it.name.contains(text, true) } as ArrayList
-                filtered.sortBy { it is Medium && !it.name.startsWith(text, true) }
-                val grouped = MediaFetcher(applicationContext).groupMedia(filtered as ArrayList<Medium>, "")
-                runOnUiThread {
+                val filtered: ArrayList<Medium> = if (isTagMode) {
+                    if (text.isBlank()) {
+                        mAllMedia.filterIsInstance<Medium>() as ArrayList<Medium>
+                    } else {
+                        imageTagsDB.search(text.trim()).map { it.fullPath }.toSet().let { paths ->
+                            mAllMedia.filter { it is Medium && it.path in paths } as ArrayList<Medium>
+                        }
+                    }
+                } else {
+                    (mAllMedia.filter { it is Medium && it.name.contains(text, true) } as ArrayList<Medium>)
+                        .also { it.sortBy { m -> !m.name.startsWith(text, true) } }
+                }
+
+                val grouped = MediaFetcher(applicationContext).groupMedia(filtered, "")
+
+             runOnUiThread {
                     if (grouped.isEmpty()) {
                         binding.searchEmptyTextPlaceholder.text = getString(org.fossify.commons.R.string.no_items_found)
                         binding.searchEmptyTextPlaceholder.beVisible()

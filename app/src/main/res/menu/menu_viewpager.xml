@@ -149,4 +149,12 @@
         android:icon="@drawable/ic_settings_cog_vector"
         android:title="@string/settings"
         app:showAsAction="ifRoom" />
+    <item android:id="@+id/menu_tags" android:showAsAction="never" android:title="@string/tags">
+        <menu>
+            <item android:id="@+id/menu_view_tags" android:title="@string/view_tags"/>
+            <item android:id="@+id/menu_generate_exif_tags" android:title="@string/generate_exif_tags"/>
+            <item android:id="@+id/menu_generate_ai_tags_preview" android:title="@string/preview_ai_tags"/>
+            <item android:id="@+id/menu_generate_ai_tags_save" android:title="@string/save_ai_tags"/>
+        </menu>
+    </item>
 </menu>

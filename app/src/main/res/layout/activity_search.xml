@@ -5,10 +5,41 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <org.fossify.commons.views.MySearchMenu
-        android:id="@+id/search_menu"
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/search_app_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MySearchMenu
+            android:id="@+id/search_menu"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <RadioGroup
+            android:id="@+id/search_mode_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+
+            <RadioButton
+                android:id="@+id/search_by_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Name"
+                android:checked="true" />
+
+            <RadioButton
+                android:id="@+id/search_by_tags"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tags" />
+
+        </RadioGroup>
+
+    </com.google.android.material.appbar.AppBarLayout>
 
     <RelativeLayout
         android:id="@+id/search_holder"
@@ -44,5 +75,7 @@
                 app:spanCount="@integer/media_columns_vertical_scroll" />
 
         </com.qtalk.recyclerviewfastscroller.RecyclerViewFastScroller>
+
     </RelativeLayout>
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
