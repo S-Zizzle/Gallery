@@ -60,6 +60,17 @@
     <string name="tagging_stopping">Stopping…</string>
     <string name="tagging_channel_name">AI Image Tagging</string>
     <string name="model_not_available">AI model not found — import it first via the Tags menu in the image viewer</string>
+    <string name="import_ai_model">Import AI Model</string>
+    <string name="importing_ai_model">Importing model…</string>
+    <string name="ai_model_imported">AI model imported successfully</string>
+    <string name="ai_model_import_failed">Failed to import AI model</string>
+    <string name="download_ai_model">Download from HuggingFace</string>
+    <string name="import_from_file">Import File</string>
+    <string name="ai_model_download_failed">Model download failed</string>
+    <string name="mobile_data_warning">Not connected to Wi-Fi. Downloading the model (~2 GB) will use mobile data. Continue?</string>
+    <string name="no_network">No network connection</string>
+    <string name="customize_ai_prompt">Customize AI Prompt</string>
+    <string name="ai_prompt_reset">Prompt reset to default</string>
 
     <!-- Filter -->
     <string name="filter_media">Filter media</string>

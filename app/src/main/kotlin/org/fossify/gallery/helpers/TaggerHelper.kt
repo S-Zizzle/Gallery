@@ -2,6 +2,7 @@ package org.fossify.gallery.helpers
 
 import android.content.Context
 import android.util.Log
+import org.fossify.gallery.extensions.config
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
@@ -17,7 +18,9 @@ class TaggerHelper(private val context: Context) {
     companion object {
         private const val TAG = "TaggerHelper"
         const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
-        internal const val TAG_PROMPT =
+        const val MODEL_DOWNLOAD_URL =
+            "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/$MODEL_FILENAME"
+        const val TAG_PROMPT =
             "List 8-10 tags for this photo. Cover: subjects (people, animals, objects), " +
             "activity or event, location type, and mood or style. " +
             "Be specific rather than generic (prefer 'ramen' over 'food', 'torii gate' over 'structure'). " +
@@ -42,7 +45,8 @@ class TaggerHelper(private val context: Context) {
                 samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7)
             )
             engine.createConversation(conversationConfig).use { conversation ->
-                val contents = Contents.of(Content.ImageFile(imagePath), Content.Text(TAG_PROMPT))
+                val prompt = context.config.aiTagPrompt
+                val contents = Contents.of(Content.ImageFile(imagePath), Content.Text(prompt))
                 val response = conversation.sendMessage(Message.user(contents))
                 val text = response.contents.contents
                     .filterIsInstance<Content.Text>()

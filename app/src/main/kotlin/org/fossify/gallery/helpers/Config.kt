@@ -602,4 +602,8 @@ class Config(context: Context) : BaseConfig(context) {
     var showPermissionRationale: Boolean
         get() = prefs.getBoolean(SHOW_PERMISSION_RATIONALE, false)
         set(showPermissionRationale) = prefs.edit().putBoolean(SHOW_PERMISSION_RATIONALE, showPermissionRationale).apply()
+
+    var aiTagPrompt: String
+        get() = prefs.getString(AI_TAG_PROMPT, TaggerHelper.TAG_PROMPT)!!
+        set(value) = prefs.edit().putString(AI_TAG_PROMPT, value).apply()
 }

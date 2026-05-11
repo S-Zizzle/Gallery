@@ -105,6 +105,7 @@ const val AVOID_SHOWING_ALL_FILES_PROMPT = "avoid_showing_all_files_prompt"
 const val SEARCH_ALL_FILES_BY_DEFAULT = "search_all_files_by_default"
 const val LAST_EXPORTED_FAVORITES_FOLDER = "last_exported_favorites_folder"
 const val SHOW_PERMISSION_RATIONALE = "show_permission_rationale"
+const val AI_TAG_PROMPT = "ai_tag_prompt"
 
 // slideshow
 const val SLIDESHOW_INTERVAL = "slideshow_interval"

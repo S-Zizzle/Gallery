@@ -2,6 +2,10 @@ package org.fossify.gallery.activities
 
 import android.Manifest
 import android.app.AlertDialog
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.widget.ProgressBar
+import androidx.activity.result.contract.ActivityResultContracts
 import android.app.WallpaperManager
 import android.content.Intent
 import android.content.IntentFilter
@@ -124,7 +128,29 @@ import java.io.IOException
 
 class MediaActivity : SimpleActivity(), MediaOperationsListener {
     override var isSearchBarEnabled = true
-    
+
+    private val modelImportLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        val progressDialog = AlertDialog.Builder(this)
+            .setMessage(R.string.importing_ai_model)
+            .setCancelable(false)
+            .setView(ProgressBar(this))
+            .show()
+        ensureBackgroundThread {
+            try {
+                val dest = TaggerHelper(applicationContext).getModelFile()
+                contentResolver.openInputStream(uri)!!.use { input ->
+                    dest.outputStream().use { output -> input.copyTo(output) }
+                }
+                runOnUiThread { progressDialog.dismiss(); toast(R.string.ai_model_imported) }
+            } catch (e: Exception) {
+                runOnUiThread { progressDialog.dismiss(); toast(R.string.ai_model_import_failed) }
+            }
+        }
+    }
+
+    @Volatile private var downloadCancelled = false
+
     private val LAST_MEDIA_CHECK_PERIOD = 3000L
 
     private var mPath = ""
@@ -355,7 +381,11 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
             findItem(R.id.about).isVisible = mShowAll
             findItem(R.id.create_new_folder).isVisible =
                 !mShowAll && mPath != RECYCLE_BIN && mPath != FAVORITES
-            findItem(R.id.tag_all_images).isVisible = mPath != RECYCLE_BIN && mPath != FAVORITES
+            val tagsVisible = mPath != RECYCLE_BIN && mPath != FAVORITES
+            findItem(R.id.menu_tags).isVisible = tagsVisible
+            if (tagsVisible) {
+                findItem(R.id.menu_bulk_tag_all).isEnabled = TaggerHelper(applicationContext).isModelAvailable()
+            }
             findItem(R.id.open_recycle_bin).isVisible = config.useRecycleBin && mPath != RECYCLE_BIN
 
             findItem(R.id.temporarily_show_hidden).isVisible = !config.shouldShowHidden
@@ -404,7 +434,9 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
                 R.id.slideshow -> startSlideshow()
                 R.id.settings -> launchSettings()
                 R.id.about -> launchAbout()
-                R.id.tag_all_images -> startBulkTagging()
+                R.id.menu_bulk_tag_all -> startBulkTagging()
+                R.id.menu_import_ai_model -> importAiModel()
+                R.id.menu_customize_prompt -> customizeAiPrompt()
                 else -> return@setOnMenuItemClickListener false
             }
             return@setOnMenuItemClickListener true
@@ -447,6 +479,142 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private fun importAiModel() {
+        val modelFile = TaggerHelper(applicationContext).getModelFile()
+        val message = if (modelFile.exists()) {
+            val sizeMb = modelFile.length() / (1024 * 1024)
+            val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(modelFile.lastModified()))
+            "Current model: ${modelFile.name}\nSize: ${sizeMb} MB\nImported: $date\n\nDownload a fresh copy or replace with a local file?"
+        } else {
+            "No model installed.\n\nDownload ${TaggerHelper.MODEL_FILENAME} from HuggingFace, or import a local file."
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.import_ai_model)
+            .setMessage(message)
+            .setPositiveButton(R.string.download_ai_model) { _, _ -> downloadAiModel() }
+            .setNeutralButton(R.string.import_from_file) { _, _ -> modelImportLauncher.launch(arrayOf("*/*")) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun customizeAiPrompt() {
+        val editText = android.widget.EditText(this).apply {
+            setText(config.aiTagPrompt)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            minLines = 4
+            maxLines = 10
+            isSingleLine = false
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad, pad, pad)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.customize_ai_prompt)
+            .setView(editText)
+            .setPositiveButton("Save") { _, _ ->
+                val text = editText.text.toString().trim()
+                config.aiTagPrompt = text.ifBlank { TaggerHelper.TAG_PROMPT }
+            }
+            .setNeutralButton("Reset to default") { _, _ ->
+                config.aiTagPrompt = TaggerHelper.TAG_PROMPT
+                toast(R.string.ai_prompt_reset)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun downloadAiModel() {
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        if (caps == null) {
+            toast(R.string.no_network)
+            return
+        }
+        if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+            AlertDialog.Builder(this)
+                .setMessage(R.string.mobile_data_warning)
+                .setPositiveButton("Continue") { _, _ -> startModelDownload() }
+                .setNegativeButton("Cancel", null)
+                .show()
+        } else {
+            startModelDownload()
+        }
+    }
+
+    private fun startModelDownload() {
+        downloadCancelled = false
+        val tagger = TaggerHelper(applicationContext)
+        val destFile = tagger.getModelFile()
+        val tmpFile = java.io.File(destFile.parent, "${destFile.name}.tmp")
+
+        val progressDialog = AlertDialog.Builder(this)
+            .setTitle(R.string.download_ai_model)
+            .setMessage("Starting…")
+            .setCancelable(false)
+            .setNegativeButton("Cancel") { _, _ ->
+                downloadCancelled = true
+                tmpFile.delete()
+            }
+            .show()
+
+        ensureBackgroundThread {
+            var connection: java.net.HttpURLConnection? = null
+            try {
+                connection = java.net.URL(TaggerHelper.MODEL_DOWNLOAD_URL).openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 30_000
+                connection.connect()
+
+                val responseCode = connection.responseCode
+                if (responseCode !in 200..299) {
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        toast("${getString(R.string.ai_model_download_failed)} (HTTP $responseCode)")
+                    }
+                    return@ensureBackgroundThread
+                }
+
+                val totalBytes = connection.contentLengthLong
+                var downloadedBytes = 0L
+
+                connection.inputStream.use { input ->
+                    tmpFile.outputStream().use { output ->
+                        val buffer = ByteArray(8 * 1024)
+                        var bytesRead = 0
+                        while (!downloadCancelled && input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            downloadedBytes += bytesRead
+                            val dlMb = downloadedBytes / (1024 * 1024)
+                            val msg = if (totalBytes > 0) "$dlMb MB / ${totalBytes / (1024 * 1024)} MB" else "$dlMb MB"
+                            runOnUiThread { progressDialog.setMessage(msg) }
+                        }
+                    }
+                }
+
+                if (downloadCancelled) {
+                    tmpFile.delete()
+                    return@ensureBackgroundThread
+                }
+
+                tmpFile.renameTo(destFile)
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    toast(R.string.ai_model_imported)
+                }
+            } catch (e: Exception) {
+                tmpFile.delete()
+                if (!downloadCancelled) {
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        toast(R.string.ai_model_download_failed)
+                    }
+                }
+            } finally {
+                connection?.disconnect()
+            }
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
