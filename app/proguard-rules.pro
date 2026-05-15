@@ -21,3 +21,6 @@ native <methods>;
 
 # Reprint
 -keep class com.github.ajalt.reprint.module.** { *; }
+
+# LiteRT LM — native JNI calls SamplerConfig/ConversationConfig getters via reflection
+-keep class com.google.ai.edge.litertlm.** { *; }
